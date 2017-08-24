@@ -39,9 +39,10 @@ public struct MoaHttpSession {
     #endif
     
     let cache = URLCache(
-      memoryCapacity: Moa.settings.cache.memoryCapacityBytes,
+      memoryCapacity: 0,
       diskCapacity: Moa.settings.cache.diskCapacityBytes,
-      diskPath: cachePath)
+      diskPath: cachePath
+    )
     
     configuration.urlCache = cache
     
