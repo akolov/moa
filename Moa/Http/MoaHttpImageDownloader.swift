@@ -19,8 +19,8 @@ final class MoaHttpImageDownloader: MoaImageDownloader {
     cancel()
   }
   
-  func startDownload(_ url: URL, onSuccess: @escaping (MoaImage)->(),
-    onError: @escaping (Error?, HTTPURLResponse?)->()) {
+  func startDownload(_ url: URL, onSuccess: @escaping (MoaImageResult) -> Void,
+    onError: @escaping (Error?, HTTPURLResponse?) -> Void) {
       
     logger?(.requestSent, url, nil, nil, nil)
     

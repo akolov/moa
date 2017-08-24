@@ -88,8 +88,8 @@ Shortcut function for creating URLSessionDataTask.
 struct MoaHttp {
 
   static func createDataTask(url: URL,
-    onSuccess: @escaping (Data?, HTTPURLResponse)->(),
-    onError: @escaping (Error?, HTTPURLResponse?)->()) -> URLSessionDataTask? {
+    onSuccess: @escaping (Data?, HTTPURLResponse) -> Void,
+    onError: @escaping (Error?, HTTPURLResponse?) -> Void) -> URLSessionDataTask? {
       
     return MoaHttpSession.session?.dataTask(with: url) { (data, response, error) in
       if let httpResponse = response as? HTTPURLResponse {
@@ -124,8 +124,8 @@ Helper functions for downloading an image and processing the response.
 struct MoaHttpImage {
 
   static func createDataTask(_ url: URL,
-    onSuccess: @escaping (MoaImage)->(),
-    onError: @escaping (Error?, HTTPURLResponse?)->()) -> URLSessionDataTask? {
+    onSuccess: @escaping (MoaImageResult) -> Void,
+    onError: @escaping (Error?, HTTPURLResponse?) -> Void) -> URLSessionDataTask? {
 
     let cachedRequest = URLRequest(url: url)
     let cachedResponse = MoaHttpSession.cache?.cachedResponse(for: cachedRequest)?.response as? HTTPURLResponse
@@ -148,7 +148,7 @@ struct MoaHttpImage {
     _ data: Data?,
     cached: Bool,
     response: HTTPURLResponse,
-    onSuccess: (MoaImage) -> Void,
+    onSuccess: (MoaImageResult) -> Void,
     onError: (Error, HTTPURLResponse?) -> Void
   ) {
     guard response.statusCode == 200 else {
@@ -158,7 +158,7 @@ struct MoaHttpImage {
 
     if cached, let url = response.url, let image = inflatedImagesCache.object(forKey: url as NSURL) {
       Moa.logger?(.responseCached, url, nil, nil, image.moa_inflated ? "inflated" : "non-inflated")
-      onSuccess(image)
+      onSuccess(.cached(image))
       return
     }
     
@@ -184,7 +184,7 @@ struct MoaHttpImage {
         inflatedImagesCache.setObject(image, forKey: url as NSURL, cost: Int(totalBytes))
       }
 
-      onSuccess(image)
+      onSuccess(.downloaded(image))
     }
     else {
       // Failed to convert response data to UIImage
@@ -265,8 +265,8 @@ final class MoaHttpImageDownloader: MoaImageDownloader {
     cancel()
   }
   
-  func startDownload(_ url: URL, onSuccess: @escaping (MoaImage)->(),
-    onError: @escaping (Error?, HTTPURLResponse?)->()) {
+  func startDownload(_ url: URL, onSuccess: @escaping (MoaImageResult) -> Void,
+    onError: @escaping (Error?, HTTPURLResponse?) -> Void) {
       
     logger?(.requestSent, url, nil, nil, nil)
     
@@ -491,7 +491,7 @@ Parameters:
 4. Error object, if applicable. Read its localizedDescription property to get a human readable error description.
 
 */
-public typealias MoaLoggerCallback = (MoaLogType, URL?, Int?, Error?, String?)->()
+public typealias MoaLoggerCallback = (MoaLogType, URL?, Int?, Error?, String?) -> Void
 
 
 // ----------------------------
@@ -679,10 +679,6 @@ public final class Moa {
   public var url: URL? {
     didSet {
       if let url = url {
-        if imageView?.image == nil {
-          imageView?.image = cachedImage(url: url)
-        }
-
         startDownload(url)
       }
       else {
@@ -764,7 +760,7 @@ public final class Moa {
       }
   
   */
-  public var onError: ((Error?, HTTPURLResponse?)->())?
+  public var onError: ((Error?, HTTPURLResponse?) -> Void)?
   
   /**
 
@@ -776,7 +772,7 @@ public final class Moa {
       }
 
   */
-  public var onErrorAsync: ((Error?, HTTPURLResponse?)->())?
+  public var onErrorAsync: ((Error?, HTTPURLResponse?) -> Void)?
   
   
   /**
@@ -795,14 +791,28 @@ public final class Moa {
 
   private func startDownload(_ url: URL) {
     cancel()
-    
+
+    var usesCachedImage = false
+    if let cached = cachedImage(url: url) {
+      usesCachedImage = true
+      handleSuccessMainQueue(cached)
+    }
+
     let simulatedDownloader = MoaSimulator.createDownloader(url)
     imageDownloader = simulatedDownloader ?? MoaHttpImageDownloader(logger: Moa.logger)
     let simulated = simulatedDownloader != nil
     
     imageDownloader?.startDownload(url,
-      onSuccess: { [weak self] image in
-        self?.handleSuccessAsync(image, isSimulated: simulated)
+      onSuccess: { [weak self] result in
+        switch result {
+        case .cached(let image):
+          if !usesCachedImage {
+            self?.handleSuccessAsync(image, isSimulated: simulated)
+          }
+
+        case .downloaded(let image):
+          self?.handleSuccessAsync(image, isSimulated: simulated)
+        }
       },
       onError: { [weak self] error, response in
         self?.handleErrorAsync(error, response: response, isSimulated: simulated)
@@ -820,7 +830,6 @@ public final class Moa {
   */
   private func handleSuccessAsync(_ image: MoaImage, isSimulated: Bool) {
     var imageForView: MoaImage? = image
-
     if let onSuccessAsync = onSuccessAsync {
       imageForView = onSuccessAsync(image)
     }
@@ -828,7 +837,8 @@ public final class Moa {
     if isSimulated {
       // Assign image in the same queue for simulated download to make unit testing simpler with synchronous code
       handleSuccessMainQueue(imageForView)
-    } else {
+    }
+    else {
       DispatchQueue.main.async { [weak self] in
         self?.handleSuccessMainQueue(imageForView)
       }
@@ -892,12 +902,21 @@ public final class Moa {
 
 import Foundation
 
+enum MoaImageResult {
+
+  case downloaded(MoaImage)
+  case cached(MoaImage)
+
+}
+
 /// Downloads an image.
 protocol MoaImageDownloader {
-  func startDownload(_ url: URL, onSuccess: @escaping (MoaImage)->(),
-    onError: @escaping (Error?, HTTPURLResponse?)->())
+
+  func startDownload(_ url: URL, onSuccess: @escaping (MoaImageResult) -> Void,
+    onError: @escaping (Error?, HTTPURLResponse?) -> Void)
   
   func cancel()
+
 }
 
 
@@ -1037,15 +1056,15 @@ public final class MoaSimulatedImageDownloader: MoaImageDownloader {
   
   var autorespondWithError: (error: Error?, response: HTTPURLResponse?)?
   
-  var onSuccess: ((MoaImage)->())?
-  var onError: ((Error, HTTPURLResponse?)->())?
+  var onSuccess: ((MoaImageResult) -> Void)?
+  var onError: ((Error, HTTPURLResponse?) -> Void)?
 
   init(url: URL) {
     self.url = url
   }
   
-  func startDownload(_ url: URL, onSuccess: @escaping  (MoaImage)->(),
-    onError: @escaping (Error?, HTTPURLResponse?)->()) {
+  func startDownload(_ url: URL, onSuccess: @escaping  (MoaImageResult) -> Void,
+    onError: @escaping (Error?, HTTPURLResponse?) -> Void) {
       
     self.onSuccess = onSuccess
     self.onError = onError
@@ -1071,7 +1090,7 @@ public final class MoaSimulatedImageDownloader: MoaImageDownloader {
   
   */
   public func respondWithImage(_ image: MoaImage) {
-    onSuccess?(image)
+    onSuccess?(.downloaded(image))
   }
   
   /**

@@ -17,15 +17,15 @@ public final class MoaSimulatedImageDownloader: MoaImageDownloader {
   
   var autorespondWithError: (error: Error?, response: HTTPURLResponse?)?
   
-  var onSuccess: ((MoaImage)->())?
-  var onError: ((Error, HTTPURLResponse?)->())?
+  var onSuccess: ((MoaImageResult) -> Void)?
+  var onError: ((Error, HTTPURLResponse?) -> Void)?
 
   init(url: URL) {
     self.url = url
   }
   
-  func startDownload(_ url: URL, onSuccess: @escaping  (MoaImage)->(),
-    onError: @escaping (Error?, HTTPURLResponse?)->()) {
+  func startDownload(_ url: URL, onSuccess: @escaping  (MoaImageResult) -> Void,
+    onError: @escaping (Error?, HTTPURLResponse?) -> Void) {
       
     self.onSuccess = onSuccess
     self.onError = onError
@@ -51,7 +51,7 @@ public final class MoaSimulatedImageDownloader: MoaImageDownloader {
   
   */
   public func respondWithImage(_ image: MoaImage) {
-    onSuccess?(image)
+    onSuccess?(.downloaded(image))
   }
   
   /**

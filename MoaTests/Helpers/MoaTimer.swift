@@ -28,9 +28,9 @@ import UIKit
 final class MoaTimer: NSObject {
   private let repeats: Bool
   private var timer: Timer?
-  private var callback: ((MoaTimer)->())?
+  private var callback: ((MoaTimer) -> Void)?
   
-  private init(interval: TimeInterval, repeats: Bool = false, callback: @escaping (MoaTimer)->()) {
+  private init(interval: TimeInterval, repeats: Bool = false, callback: @escaping (MoaTimer) -> Void) {
     self.repeats = repeats
     
     super.init()
@@ -56,7 +56,7 @@ final class MoaTimer: NSObject {
   
   @discardableResult
   class func runAfter(_ interval: TimeInterval, repeats: Bool = false,
-    callback: @escaping (MoaTimer)->()) -> MoaTimer {
+    callback: @escaping (MoaTimer) -> Void) -> MoaTimer {
       
     return MoaTimer(interval: interval, repeats: repeats, callback: callback)
   }

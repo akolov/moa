@@ -132,7 +132,7 @@ class MoaImageDownloaderTests: XCTestCase {
     var httpUrlResponseFromCallback: HTTPURLResponse?
     var task: URLSessionDataTask?
   
-    let closure:()->() = {
+    let closure:() -> Void = {
       let downloader = MoaHttpImageDownloader(logger: self.testLogger)
       downloader.startDownload("http://evgenii.com/moa/35px.jpg",
         onSuccess: { image in

@@ -78,10 +78,6 @@ public final class Moa {
   public var url: URL? {
     didSet {
       if let url = url {
-        if imageView?.image == nil {
-          imageView?.image = cachedImage(url: url)
-        }
-
         startDownload(url)
       }
       else {
@@ -163,7 +159,7 @@ public final class Moa {
       }
   
   */
-  public var onError: ((Error?, HTTPURLResponse?)->())?
+  public var onError: ((Error?, HTTPURLResponse?) -> Void)?
   
   /**
 
@@ -175,7 +171,7 @@ public final class Moa {
       }
 
   */
-  public var onErrorAsync: ((Error?, HTTPURLResponse?)->())?
+  public var onErrorAsync: ((Error?, HTTPURLResponse?) -> Void)?
   
   
   /**
@@ -194,14 +190,28 @@ public final class Moa {
 
   private func startDownload(_ url: URL) {
     cancel()
-    
+
+    var usesCachedImage = false
+    if let cached = cachedImage(url: url) {
+      usesCachedImage = true
+      handleSuccessMainQueue(cached)
+    }
+
     let simulatedDownloader = MoaSimulator.createDownloader(url)
     imageDownloader = simulatedDownloader ?? MoaHttpImageDownloader(logger: Moa.logger)
     let simulated = simulatedDownloader != nil
     
     imageDownloader?.startDownload(url,
-      onSuccess: { [weak self] image in
-        self?.handleSuccessAsync(image, isSimulated: simulated)
+      onSuccess: { [weak self] result in
+        switch result {
+        case .cached(let image):
+          if !usesCachedImage {
+            self?.handleSuccessAsync(image, isSimulated: simulated)
+          }
+
+        case .downloaded(let image):
+          self?.handleSuccessAsync(image, isSimulated: simulated)
+        }
       },
       onError: { [weak self] error, response in
         self?.handleErrorAsync(error, response: response, isSimulated: simulated)
@@ -219,7 +229,6 @@ public final class Moa {
   */
   private func handleSuccessAsync(_ image: MoaImage, isSimulated: Bool) {
     var imageForView: MoaImage? = image
-
     if let onSuccessAsync = onSuccessAsync {
       imageForView = onSuccessAsync(image)
     }
@@ -227,7 +236,8 @@ public final class Moa {
     if isSimulated {
       // Assign image in the same queue for simulated download to make unit testing simpler with synchronous code
       handleSuccessMainQueue(imageForView)
-    } else {
+    }
+    else {
       DispatchQueue.main.async { [weak self] in
         self?.handleSuccessMainQueue(imageForView)
       }

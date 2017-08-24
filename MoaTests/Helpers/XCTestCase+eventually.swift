@@ -4,7 +4,7 @@ extension XCTestCase {
   func moa_eventually(
     _ condition: @autoclosure @escaping() -> Bool,
     timeout: TimeInterval = 1,
-    callback: ()->()) {
+    callback: () -> Void) {
     
     let moaExpectation = expectation(description: "moa expectation")
     
@@ -19,7 +19,7 @@ extension XCTestCase {
     callback()
   }
   
-  func moa_eventually(_ timeout: TimeInterval = 0.1, callback: ()->()) {
+  func moa_eventually(_ timeout: TimeInterval = 0.1, callback: () -> Void) {
     let moaExpectation = expectation(description: "moa expectation")
     
     let _ = MoaTimer.runAfter(timeout) { timer in

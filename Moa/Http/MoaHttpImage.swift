@@ -9,8 +9,8 @@ Helper functions for downloading an image and processing the response.
 struct MoaHttpImage {
 
   static func createDataTask(_ url: URL,
-    onSuccess: @escaping (MoaImage)->(),
-    onError: @escaping (Error?, HTTPURLResponse?)->()) -> URLSessionDataTask? {
+    onSuccess: @escaping (MoaImageResult) -> Void,
+    onError: @escaping (Error?, HTTPURLResponse?) -> Void) -> URLSessionDataTask? {
 
     let cachedRequest = URLRequest(url: url)
     let cachedResponse = MoaHttpSession.cache?.cachedResponse(for: cachedRequest)?.response as? HTTPURLResponse
@@ -33,7 +33,7 @@ struct MoaHttpImage {
     _ data: Data?,
     cached: Bool,
     response: HTTPURLResponse,
-    onSuccess: (MoaImage) -> Void,
+    onSuccess: (MoaImageResult) -> Void,
     onError: (Error, HTTPURLResponse?) -> Void
   ) {
     guard response.statusCode == 200 else {
@@ -43,7 +43,7 @@ struct MoaHttpImage {
 
     if cached, let url = response.url, let image = inflatedImagesCache.object(forKey: url as NSURL) {
       Moa.logger?(.responseCached, url, nil, nil, image.moa_inflated ? "inflated" : "non-inflated")
-      onSuccess(image)
+      onSuccess(.cached(image))
       return
     }
     
@@ -69,7 +69,7 @@ struct MoaHttpImage {
         inflatedImagesCache.setObject(image, forKey: url as NSURL, cost: Int(totalBytes))
       }
 
-      onSuccess(image)
+      onSuccess(.downloaded(image))
     }
     else {
       // Failed to convert response data to UIImage
