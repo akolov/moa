@@ -63,7 +63,7 @@ struct MoaHttpImage {
     }
       
     if let data = data, let image = MoaImage(data: data) {
-      if let url = response.url {
+      if Moa.settings.cache.memoryCapacityBytes > 0, let url = response.url {
         image.moa_inflate()
         let totalBytes = byteSize(of: image)
         inflatedImagesCache.setObject(image, forKey: url as NSURL, cost: Int(totalBytes))
