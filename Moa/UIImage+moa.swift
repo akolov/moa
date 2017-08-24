@@ -46,6 +46,7 @@ extension UIImage {
       return
     }
 
+    dispatchPrecondition(condition: .notOnQueue(.main))
     moa_inflated = true
     _ = cgImage?.dataProvider?.data
   }

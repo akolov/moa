@@ -64,13 +64,14 @@ struct MoaHttpImage {
       
     if let data = data, let image = MoaImage(data: data) {
       if let url = response.url {
-        let totalBytes = byteSize(of: image)
-        inflatedImagesCache.setObject(image, forKey: url as NSURL, cost: Int(totalBytes))
         if Moa.settings.shouldInflateImages {
           inflationQueue.async {
             image.moa_inflate()
           }
         }
+
+        let totalBytes = byteSize(of: image)
+        inflatedImagesCache.setObject(image, forKey: url as NSURL, cost: Int(totalBytes))
       }
 
       onSuccess(image)

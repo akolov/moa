@@ -179,10 +179,10 @@ struct MoaHttpImage {
       
     if let data = data, let image = MoaImage(data: data) {
       if let url = response.url {
-        let totalBytes = byteSize(of: image)
-        inflatedImagesCache.setObject(image, forKey: url as NSURL, cost: Int(totalBytes))
         if Moa.settings.shouldInflateImages {
           inflationQueue.async {
+            let totalBytes = byteSize(of: image)
+            inflatedImagesCache.setObject(image, forKey: url as NSURL, cost: Int(totalBytes))
             image.moa_inflate()
           }
         }
@@ -1351,6 +1351,7 @@ extension UIImage {
       return
     }
 
+    dispatchPrecondition(condition: .notOnQueue(.main))
     moa_inflated = true
     _ = cgImage?.dataProvider?.data
   }
