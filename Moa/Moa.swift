@@ -75,7 +75,7 @@ public final class Moa {
       }
 
   */
-  public var url: String? {
+  public var url: URL? {
     didSet {
       cancel()
 
@@ -114,19 +114,8 @@ public final class Moa {
  
   */
 
-  public func cachedImage(url: String) -> UIImage? {
-    guard
-      let cache = MoaHttpSession.session?.configuration.urlCache,
-      let aUrl = URL(string: url) else {
-      return nil
-    }
-
-    let request = URLRequest(url: aUrl)
-    guard let response = cache.cachedResponse(for: request) else {
-      return nil
-    }
-
-    return UIImage(data: response.data)
+  public func cachedImage(url: URL) -> UIImage? {
+    return MoaHttpImage.cachedImage(url: url)
   }
   
   /**
@@ -202,7 +191,7 @@ public final class Moa {
   */
   public static var errorImage: MoaImage?
 
-  private func startDownload(_ url: String) {
+  private func startDownload(_ url: URL) {
     cancel()
     
     let simulatedDownloader = MoaSimulator.createDownloader(url)
@@ -289,4 +278,5 @@ public final class Moa {
       return errorImage ?? Moa.errorImage
     }
   }
+
 }

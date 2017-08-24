@@ -17,6 +17,10 @@ public struct MoaHttpSession {
       currentSession = newValue
     }
   }
+
+  static var cache: URLCache? {
+    return currentSession?.configuration.urlCache
+  }
   
   private static func createNewSession() -> URLSession {
     let configuration = URLSessionConfiguration.default

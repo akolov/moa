@@ -48,7 +48,7 @@ class ViewController: UIViewController {
   
   @IBAction func onJosephSmitTapped(_ sender: AnyObject) {
     if let url = URL(string: "http://en.wikipedia.org/wiki/Joseph_Smit") {
-      UIApplication.shared.openURL(url)
+      UIApplication.shared.open(url, options: [:], completionHandler: nil)
     }
   }
 }

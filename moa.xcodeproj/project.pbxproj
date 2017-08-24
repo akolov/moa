@@ -135,6 +135,7 @@
 		C417C5121B18929B00ED71BB /* moaosx.h in Headers */ = {isa = PBXBuildFile; fileRef = C417C5111B18929B00ED71BB /* moaosx.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		C417C5261B1892C600ED71BB /* Moa.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7EA8EFA71B0858DD00C951C4 /* Moa.swift */; };
 		C417C52C1B18954400ED71BB /* ImageView+moa.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7EA8EF931B08454B00C951C4 /* ImageView+moa.swift */; };
+		FA04883C1F4F2C3800F734A9 /* UIImage+moa.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA04883B1F4F2C3800F734A9 /* UIImage+moa.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -277,6 +278,7 @@
 		C417C50D1B18929B00ED71BB /* moa.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = moa.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		C417C5101B18929B00ED71BB /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		C417C5111B18929B00ED71BB /* moaosx.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = moaosx.h; sourceTree = "<group>"; };
+		FA04883B1F4F2C3800F734A9 /* UIImage+moa.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = "UIImage+moa.swift"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -561,6 +563,7 @@
 				7EBCC1C81B1B33AF00BC9569 /* MoaSettings.swift */,
 				7EBCC1D11B1B3F2E00BC9569 /* MoaSettingsCache.swift */,
 				7EA8EF931B08454B00C951C4 /* ImageView+moa.swift */,
+				FA04883B1F4F2C3800F734A9 /* UIImage+moa.swift */,
 				7EA8EF741B072B4300C951C4 /* moa.h */,
 				7EA8EF721B072B4300C951C4 /* Supporting Files */,
 			);
@@ -1032,6 +1035,7 @@
 				7E94E8871B99262600B22919 /* MoaLoggerText.swift in Sources */,
 				2BB1704E1B9828D500DADFB8 /* MoaLogType.swift in Sources */,
 				7EA8EFA81B0858DD00C951C4 /* Moa.swift in Sources */,
+				FA04883C1F4F2C3800F734A9 /* UIImage+moa.swift in Sources */,
 				2BB1704C1B9828A200DADFB8 /* MoaLoggerCallback.swift in Sources */,
 				7E112C241B367E600017AFF0 /* MoaString.swift in Sources */,
 			);
@@ -1312,7 +1316,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 8.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 10.0;
 				MTL_ENABLE_DEBUG_INFO = YES;
 				ONLY_ACTIVE_ARCH = YES;
 				SDKROOT = iphoneos;
@@ -1357,7 +1361,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 8.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 10.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				SDKROOT = iphoneos;
 				SWIFT_OPTIMIZATION_LEVEL = "-Owholemodule";

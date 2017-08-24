@@ -40,6 +40,7 @@ public struct MoaSettingsCache {
 
   public func clear(url: String? = nil) {
     guard let url = url else {
+      MoaHttpImage.inflatedImagesCache.removeAllObjects()
       MoaHttpSession.session?.configuration.urlCache?.removeAllCachedResponses()
       return
     }
@@ -49,6 +50,7 @@ public struct MoaSettingsCache {
     }
 
     let request = URLRequest(url: aUrl)
+    MoaHttpImage.inflatedImagesCache.removeObject(forKey: aUrl as NSURL)
     MoaHttpSession.session?.configuration.urlCache?.removeCachedResponse(for: request)
   }
 }

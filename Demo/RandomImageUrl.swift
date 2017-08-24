@@ -4,6 +4,9 @@ Returns URL to random image. Previously returned image names are kept in memory 
 returning same images in a row.
 
 */
+
+import Foundation
+
 class RandomImageUrl {
   var seenImageNames = [String]()
   
@@ -42,11 +45,11 @@ class RandomImageUrl {
     return iiRandom.random(unseen) ?? "AcanthochoerusGroteiSmit.jpg"
   }
   
-  var url: String {
+  var url: URL! {
     let imageName = randomUnseenImageName
     rememberImageName(imageName)
 
-    return RandomImageUrl.hostAndPath + imageName
+    return URL(string: RandomImageUrl.hostAndPath + imageName)
   }
   
   func rememberImageName(_ url: String) {

@@ -100,13 +100,13 @@ public final class MoaSimulator {
     simulators = []
   }
   
-  static func simulatorsMatchingUrl(_ url: String) -> [MoaSimulator] {
+  static func simulatorsMatchingUrl(_ url: URL) -> [MoaSimulator] {
     return simulators.filter { simulator in
-      MoaString.contains(url, substring: simulator.urlPart)
+      MoaString.contains(url.absoluteString, substring: simulator.urlPart)
     }
   }
   
-  static func createDownloader(_ url: String) -> MoaSimulatedImageDownloader? {
+  static func createDownloader(_ url: URL) -> MoaSimulatedImageDownloader? {
     let matchingSimulators = simulatorsMatchingUrl(url)
     
     if !matchingSimulators.isEmpty {

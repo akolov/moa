@@ -86,24 +86,12 @@ Shortcut function for creating URLSessionDataTask.
 
 */
 struct MoaHttp {
-  static func createDataTask(_ url: String,
+
+  static func createDataTask(url: URL,
     onSuccess: @escaping (Data?, HTTPURLResponse)->(),
     onError: @escaping (Error?, HTTPURLResponse?)->()) -> URLSessionDataTask? {
       
-    if let urlObject = URL(string: url) {
-      return createDataTask(urlObject: urlObject, onSuccess: onSuccess, onError: onError)
-    }
-    
-    // Error converting string to NSURL
-    onError(MoaError.invalidUrlString, nil)
-    return nil
-  }
-  
-  private static func createDataTask(urlObject: URL,
-    onSuccess: @escaping (Data?, HTTPURLResponse)->(),
-    onError: @escaping (Error?, HTTPURLResponse?)->()) -> URLSessionDataTask? {
-      
-    return MoaHttpSession.session?.dataTask(with: urlObject) { (data, response, error) in
+    return MoaHttpSession.session?.dataTask(with: url) { (data, response, error) in
       if let httpResponse = response as? HTTPURLResponse {
         if error == nil {
           onSuccess(data, httpResponse)
@@ -115,6 +103,7 @@ struct MoaHttp {
       }
     }
   }
+
 }
 
 
@@ -133,26 +122,43 @@ Helper functions for downloading an image and processing the response.
 
 */
 struct MoaHttpImage {
-  static func createDataTask(_ url: String,
+
+  static func createDataTask(_ url: URL,
     onSuccess: @escaping (MoaImage)->(),
     onError: @escaping (Error?, HTTPURLResponse?)->()) -> URLSessionDataTask? {
-    
-    return MoaHttp.createDataTask(url,
+
+    let cachedRequest = URLRequest(url: url)
+    let cachedResponse = MoaHttpSession.cache?.cachedResponse(for: cachedRequest)?.response as? HTTPURLResponse
+    let cachedEtag = cachedResponse?.allHeaderFields["Etag"] as? String
+    let cachedLastModified = cachedResponse?.allHeaderFields["Last-Modified"] as? String
+
+    return MoaHttp.createDataTask(
+      url: url,
       onSuccess: { data, response in
-        self.handleSuccess(data, response: response, onSuccess: onSuccess, onError: onError)
+        let etag = response.allHeaderFields["Etag"] as? String
+        let lastModified = response.allHeaderFields["Last-Modified"] as? String
+        let isCached = etag == cachedEtag && lastModified == cachedLastModified
+        self.handleSuccess(data, cached: isCached, response: response, onSuccess: onSuccess, onError: onError)
       },
       onError: onError
     )
   }
   
-  static func handleSuccess(_ data: Data?,
+  static func handleSuccess(
+    _ data: Data?,
+    cached: Bool,
     response: HTTPURLResponse,
     onSuccess: (MoaImage)->(),
-    onError: (Error, HTTPURLResponse?)->()) {
-      
-    // Show error if response code is not 200
-    if response.statusCode != 200 {
+    onError: (Error, HTTPURLResponse?) -> Void
+  ) {
+    guard response.statusCode == 200 else {
       onError(MoaError.httpStatusCodeIsNot200, response)
+      return
+    }
+
+    if cached, let url = response.url, let cached = inflatedImagesCache.object(forKey: url as NSURL) {
+      print("Got image from NSCache: \(url)")
+      onSuccess(cached)
       return
     }
     
@@ -172,18 +178,74 @@ struct MoaHttpImage {
     }
       
     if let data = data, let image = MoaImage(data: data) {
+      image.moa_inflate()
+
+      if let url = response.url {
+        let totalBytes = byteSize(of: image)
+        inflatedImagesCache.setObject(image, forKey: url as NSURL, cost: Int(totalBytes))
+      }
+
       onSuccess(image)
-    } else {
+    }
+    else {
       // Failed to convert response data to UIImage
       let error = MoaError.failedToReadImageData
       onError(error, response)
     }
   }
-  
+
+  static func cachedImage(url: URL) -> UIImage? {
+    guard let cache = MoaHttpSession.cache else {
+      return nil
+    }
+
+    let request = URLRequest(url: url)
+    guard let cachedResponse = cache.cachedResponse(for: request),
+          let httpResponse = cachedResponse.response as? HTTPURLResponse else {
+      return nil
+    }
+
+    var image: UIImage?
+    handleSuccess(
+      cachedResponse.data,
+      cached: true,
+      response: httpResponse,
+      onSuccess: { img in
+        image = img
+      },
+      onError: { error, _ in
+        Moa.logger?(.responseError, url, nil, error)
+      }
+    )
+
+    return image
+  }
+
+  private static func byteSize(of image: MoaImage) -> UInt64 {
+    #if os(iOS) || os(tvOS) || os(watchOS)
+      let size = CGSize(width: image.size.width * image.scale, height: image.size.height * image.scale)
+    #elseif os(macOS)
+      let size = CGSize(width: image.size.width, height: image.size.height)
+    #endif
+
+    let bytesPerPixel: CGFloat = 4.0
+    let bytesPerRow = size.width * bytesPerPixel
+    let totalBytes = UInt64(bytesPerRow) * UInt64(size.height)
+
+    return totalBytes
+  }
+
   private static func validMimeType(_ mimeType: String) -> Bool {
     let validMimeTypes = ["image/jpeg", "image/jpg", "image/pjpeg", "image/png", "image/gif"]
     return validMimeTypes.contains(mimeType)
   }
+
+  static var inflatedImagesCache: NSCache<NSURL, UIImage> = {
+    let cache = NSCache<NSURL, MoaImage>()
+    cache.totalCostLimit = Moa.settings.cache.memoryCapacityBytes
+    return cache
+  }()
+
 }
 
 
@@ -214,7 +276,7 @@ final class MoaHttpImageDownloader: MoaImageDownloader {
     cancel()
   }
   
-  func startDownload(_ url: String, onSuccess: @escaping (MoaImage)->(),
+  func startDownload(_ url: URL, onSuccess: @escaping (MoaImage)->(),
     onError: @escaping (Error?, HTTPURLResponse?)->()) {
       
     logger?(.requestSent, url, nil, nil)
@@ -249,7 +311,7 @@ final class MoaHttpImageDownloader: MoaImageDownloader {
     task?.cancel()
     
     if canLogCancel {
-      let url = task?.originalRequest?.url?.absoluteString ?? ""
+      let url = task?.originalRequest?.url
       logger?(.requestCancelled, url, nil, nil)
     }
   }
@@ -280,6 +342,10 @@ public struct MoaHttpSession {
     set {
       currentSession = newValue
     }
+  }
+
+  static var cache: URLCache? {
+    return currentSession?.configuration.urlCache
   }
   
   private static func createNewSession() -> URLSession {
@@ -409,7 +475,7 @@ Usage:
     Moa.logger = MoaConsoleLogger
 
 */
-public func MoaConsoleLogger(_ type: MoaLogType, url: String, statusCode: Int?, error: Error?) {
+public func MoaConsoleLogger(_ type: MoaLogType, url: URL?, statusCode: Int?, error: Error?) {
   let text = MoaLoggerText(type, url: url, statusCode: statusCode, error: error)
   print(text)
 }
@@ -435,7 +501,7 @@ Parameters:
 4. Error object, if applicable. Read its localizedDescription property to get a human readable error description.
 
 */
-public typealias MoaLoggerCallback = (MoaLogType, String, Int?, Error?)->()
+public typealias MoaLoggerCallback = (MoaLogType, URL?, Int?, Error?)->()
 
 
 // ----------------------------
@@ -463,7 +529,7 @@ For logging into Xcode console you can use MoaConsoleLogger function.
     Moa.logger = MoaConsoleLogger
 
 */
-public func MoaLoggerText(_ type: MoaLogType, url: String, statusCode: Int?,
+public func MoaLoggerText(_ type: MoaLogType, url: URL?, statusCode: Int?,
   error: Error?) -> String {
   
   let time = MoaTime.nowLogTime
@@ -493,7 +559,7 @@ public func MoaLoggerText(_ type: MoaLogType, url: String, statusCode: Int?,
     }
   }
   
-  text += url
+  text += url.map { String(describing: $0) } ?? "-"
   
   if suffix != "" {
     text += " \(suffix)"
@@ -612,11 +678,15 @@ public final class Moa {
       }
 
   */
-  public var url: String? {
+  public var url: URL? {
     didSet {
       cancel()
 
       if let url = url {
+        if imageView?.image == nil {
+          imageView?.image = cachedImage(url: url)
+        }
+
         startDownload(url)
       }
     }
@@ -647,19 +717,8 @@ public final class Moa {
  
   */
 
-  public func cachedImage(url: String) -> UIImage? {
-    guard
-      let cache = MoaHttpSession.session?.configuration.urlCache,
-      let aUrl = URL(string: url) else {
-      return nil
-    }
-
-    let request = URLRequest(url: aUrl)
-    guard let response = cache.cachedResponse(for: request) else {
-      return nil
-    }
-
-    return UIImage(data: response.data)
+  public func cachedImage(url: URL) -> UIImage? {
+    return MoaHttpImage.cachedImage(url: url)
   }
   
   /**
@@ -735,7 +794,7 @@ public final class Moa {
   */
   public static var errorImage: MoaImage?
 
-  private func startDownload(_ url: String) {
+  private func startDownload(_ url: URL) {
     cancel()
     
     let simulatedDownloader = MoaSimulator.createDownloader(url)
@@ -822,6 +881,7 @@ public final class Moa {
       return errorImage ?? Moa.errorImage
     }
   }
+
 }
 
 
@@ -835,7 +895,7 @@ import Foundation
 
 /// Downloads an image.
 protocol MoaImageDownloader {
-  func startDownload(_ url: String, onSuccess: @escaping (MoaImage)->(),
+  func startDownload(_ url: URL, onSuccess: @escaping (MoaImage)->(),
     onError: @escaping (Error?, HTTPURLResponse?)->())
   
   func cancel()
@@ -928,6 +988,7 @@ public struct MoaSettingsCache {
 
   public func clear(url: String? = nil) {
     guard let url = url else {
+      MoaHttpImage.inflatedImagesCache.removeAllObjects()
       MoaHttpSession.session?.configuration.urlCache?.removeAllCachedResponses()
       return
     }
@@ -937,6 +998,7 @@ public struct MoaSettingsCache {
     }
 
     let request = URLRequest(url: aUrl)
+    MoaHttpImage.inflatedImagesCache.removeObject(forKey: aUrl as NSURL)
     MoaHttpSession.session?.configuration.urlCache?.removeCachedResponse(for: request)
   }
 }
@@ -969,7 +1031,7 @@ Simulates download of images in unit test. This downloader is used instead of th
 public final class MoaSimulatedImageDownloader: MoaImageDownloader {
   
   /// Url of the downloader.
-  public let url: String
+  public let url: URL
   
   /// Indicates if the request was cancelled.
   public var cancelled = false
@@ -981,11 +1043,11 @@ public final class MoaSimulatedImageDownloader: MoaImageDownloader {
   var onSuccess: ((MoaImage)->())?
   var onError: ((Error, HTTPURLResponse?)->())?
 
-  init(url: String) {
+  init(url: URL) {
     self.url = url
   }
   
-  func startDownload(_ url: String, onSuccess: @escaping  (MoaImage)->(),
+  func startDownload(_ url: URL, onSuccess: @escaping  (MoaImage)->(),
     onError: @escaping (Error?, HTTPURLResponse?)->()) {
       
     self.onSuccess = onSuccess
@@ -1138,13 +1200,13 @@ public final class MoaSimulator {
     simulators = []
   }
   
-  static func simulatorsMatchingUrl(_ url: String) -> [MoaSimulator] {
+  static func simulatorsMatchingUrl(_ url: URL) -> [MoaSimulator] {
     return simulators.filter { simulator in
-      MoaString.contains(url, substring: simulator.urlPart)
+      MoaString.contains(url.absoluteString, substring: simulator.urlPart)
     }
   }
   
-  static func createDownloader(_ url: String) -> MoaSimulatedImageDownloader? {
+  static func createDownloader(_ url: URL) -> MoaSimulatedImageDownloader? {
     let matchingSimulators = simulatorsMatchingUrl(url)
     
     if !matchingSimulators.isEmpty {
@@ -1211,6 +1273,67 @@ public final class MoaSimulator {
       downloader.respondWithError(error, response: response)
     }
   }
+}
+
+
+// ----------------------------
+//
+// UIImage+moa.swift
+//
+// ----------------------------
+
+//
+//  UIImage+moa.swift
+//  moa
+//
+//  Created by Alexander Kolov on 24.8.2017.
+//  Copyright © 2017 Evgenii Neumerzhitckii. All rights reserved.
+//
+
+import UIKit
+
+extension UIImage {
+
+  private struct AssociatedKey {
+    static var inflated = "moa_UIImage.Inflated"
+  }
+
+  /**
+  
+  Returns whether the image is inflated.
+ 
+  */
+  public var moa_inflated: Bool {
+    get {
+      if let inflated = objc_getAssociatedObject(self, &AssociatedKey.inflated) as? Bool {
+        return inflated
+      }
+      else {
+        return false
+      }
+    }
+    set {
+      objc_setAssociatedObject(self, &AssociatedKey.inflated, newValue, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
+    }
+  }
+
+  /**
+ 
+  Inflates the underlying compressed image data to be backed by an uncompressed bitmap representation.
+
+  Inflating compressed image formats (such as PNG or JPEG) can significantly improve drawing performance as it
+  allows a bitmap representation to be constructed in the background rather than on the main thread.
+ 
+  */
+  public func moa_inflate() {
+    guard !moa_inflated else {
+      return
+    }
+
+    moa_inflated = true
+    _ = cgImage?.dataProvider?.data
+  }
+
 }
 
 

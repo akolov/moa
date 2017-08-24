@@ -7,26 +7,42 @@ Helper functions for downloading an image and processing the response.
 
 */
 struct MoaHttpImage {
-  static func createDataTask(_ url: String,
+
+  static func createDataTask(_ url: URL,
     onSuccess: @escaping (MoaImage)->(),
     onError: @escaping (Error?, HTTPURLResponse?)->()) -> URLSessionDataTask? {
-    
-    return MoaHttp.createDataTask(url,
+
+    let cachedRequest = URLRequest(url: url)
+    let cachedResponse = MoaHttpSession.cache?.cachedResponse(for: cachedRequest)?.response as? HTTPURLResponse
+    let cachedEtag = cachedResponse?.allHeaderFields["Etag"] as? String
+    let cachedLastModified = cachedResponse?.allHeaderFields["Last-Modified"] as? String
+
+    return MoaHttp.createDataTask(
+      url: url,
       onSuccess: { data, response in
-        self.handleSuccess(data, response: response, onSuccess: onSuccess, onError: onError)
+        let etag = response.allHeaderFields["Etag"] as? String
+        let lastModified = response.allHeaderFields["Last-Modified"] as? String
+        let isCached = etag == cachedEtag && lastModified == cachedLastModified
+        self.handleSuccess(data, cached: isCached, response: response, onSuccess: onSuccess, onError: onError)
       },
       onError: onError
     )
   }
   
-  static func handleSuccess(_ data: Data?,
+  static func handleSuccess(
+    _ data: Data?,
+    cached: Bool,
     response: HTTPURLResponse,
     onSuccess: (MoaImage)->(),
-    onError: (Error, HTTPURLResponse?)->()) {
-      
-    // Show error if response code is not 200
-    if response.statusCode != 200 {
+    onError: (Error, HTTPURLResponse?) -> Void
+  ) {
+    guard response.statusCode == 200 else {
       onError(MoaError.httpStatusCodeIsNot200, response)
+      return
+    }
+
+    if cached, let url = response.url, let cached = inflatedImagesCache.object(forKey: url as NSURL) {
+      onSuccess(cached)
       return
     }
     
@@ -46,16 +62,72 @@ struct MoaHttpImage {
     }
       
     if let data = data, let image = MoaImage(data: data) {
+      image.moa_inflate()
+
+      if let url = response.url {
+        let totalBytes = byteSize(of: image)
+        inflatedImagesCache.setObject(image, forKey: url as NSURL, cost: Int(totalBytes))
+      }
+
       onSuccess(image)
-    } else {
+    }
+    else {
       // Failed to convert response data to UIImage
       let error = MoaError.failedToReadImageData
       onError(error, response)
     }
   }
-  
+
+  static func cachedImage(url: URL) -> UIImage? {
+    guard let cache = MoaHttpSession.cache else {
+      return nil
+    }
+
+    let request = URLRequest(url: url)
+    guard let cachedResponse = cache.cachedResponse(for: request),
+          let httpResponse = cachedResponse.response as? HTTPURLResponse else {
+      return nil
+    }
+
+    var image: UIImage?
+    handleSuccess(
+      cachedResponse.data,
+      cached: true,
+      response: httpResponse,
+      onSuccess: { img in
+        image = img
+      },
+      onError: { error, _ in
+        Moa.logger?(.responseError, url, nil, error)
+      }
+    )
+
+    return image
+  }
+
+  private static func byteSize(of image: MoaImage) -> UInt64 {
+    #if os(iOS) || os(tvOS) || os(watchOS)
+      let size = CGSize(width: image.size.width * image.scale, height: image.size.height * image.scale)
+    #elseif os(macOS)
+      let size = CGSize(width: image.size.width, height: image.size.height)
+    #endif
+
+    let bytesPerPixel: CGFloat = 4.0
+    let bytesPerRow = size.width * bytesPerPixel
+    let totalBytes = UInt64(bytesPerRow) * UInt64(size.height)
+
+    return totalBytes
+  }
+
   private static func validMimeType(_ mimeType: String) -> Bool {
     let validMimeTypes = ["image/jpeg", "image/jpg", "image/pjpeg", "image/png", "image/gif"]
     return validMimeTypes.contains(mimeType)
   }
+
+  static var inflatedImagesCache: NSCache<NSURL, UIImage> = {
+    let cache = NSCache<NSURL, MoaImage>()
+    cache.totalCostLimit = Moa.settings.cache.memoryCapacityBytes
+    return cache
+  }()
+
 }

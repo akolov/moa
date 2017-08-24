@@ -19,7 +19,7 @@ final class MoaHttpImageDownloader: MoaImageDownloader {
     cancel()
   }
   
-  func startDownload(_ url: String, onSuccess: @escaping (MoaImage)->(),
+  func startDownload(_ url: URL, onSuccess: @escaping (MoaImage)->(),
     onError: @escaping (Error?, HTTPURLResponse?)->()) {
       
     logger?(.requestSent, url, nil, nil)
@@ -54,7 +54,7 @@ final class MoaHttpImageDownloader: MoaImageDownloader {
     task?.cancel()
     
     if canLogCancel {
-      let url = task?.originalRequest?.url?.absoluteString ?? ""
+      let url = task?.originalRequest?.url
       logger?(.requestCancelled, url, nil, nil)
     }
   }
