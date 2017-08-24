@@ -33,7 +33,7 @@ struct MoaHttpImage {
     _ data: Data?,
     cached: Bool,
     response: HTTPURLResponse,
-    onSuccess: (MoaImage)->(),
+    onSuccess: (MoaImage) -> Void,
     onError: (Error, HTTPURLResponse?) -> Void
   ) {
     guard response.statusCode == 200 else {
@@ -64,12 +64,7 @@ struct MoaHttpImage {
       
     if let data = data, let image = MoaImage(data: data) {
       if let url = response.url {
-        if Moa.settings.shouldInflateImages {
-          inflationQueue.async {
-            image.moa_inflate()
-          }
-        }
-
+        image.moa_inflate()
         let totalBytes = byteSize(of: image)
         inflatedImagesCache.setObject(image, forKey: url as NSURL, cost: Int(totalBytes))
       }
@@ -84,29 +79,11 @@ struct MoaHttpImage {
   }
 
   static func cachedImage(url: URL) -> UIImage? {
-    guard let cache = MoaHttpSession.cache else {
+    guard let image = inflatedImagesCache.object(forKey: url as NSURL) else {
       return nil
     }
 
-    let request = URLRequest(url: url)
-    guard let cachedResponse = cache.cachedResponse(for: request),
-          let httpResponse = cachedResponse.response as? HTTPURLResponse else {
-      return nil
-    }
-
-    var image: UIImage?
-    handleSuccess(
-      cachedResponse.data,
-      cached: true,
-      response: httpResponse,
-      onSuccess: { img in
-        image = img
-      },
-      onError: { error, _ in
-        Moa.logger?(.responseError, url, nil, error, nil)
-      }
-    )
-
+    Moa.logger?(.responseCached, url, nil, nil, image.moa_inflated ? "inflated" : "non-inflated")
     return image
   }
 
