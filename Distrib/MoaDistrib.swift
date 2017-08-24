@@ -181,8 +181,10 @@ struct MoaHttpImage {
       if let url = response.url {
         let totalBytes = byteSize(of: image)
         inflatedImagesCache.setObject(image, forKey: url as NSURL, cost: Int(totalBytes))
-        inflationQueue.async {
-          image.moa_inflate()
+        if Moa.settings.shouldInflateImages {
+          inflationQueue.async {
+            image.moa_inflate()
+          }
         }
       }
 
@@ -944,6 +946,8 @@ public struct MoaSettings {
   
   /// Maximum number of simultaneous image downloads. Default: 4.
   public var maximumSimultaneousDownloads: Int = 4
+
+  public var shouldInflateImages: Bool = true
 }
 
 func ==(lhs: MoaSettings, rhs: MoaSettings) -> Bool {
