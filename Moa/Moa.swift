@@ -80,6 +80,10 @@ public final class Moa {
       cancel()
 
       if let url = url {
+        if imageView?.image == nil {
+          imageView?.image = cachedImage(url: url)
+        }
+
         startDownload(url)
       }
     }
