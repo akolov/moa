@@ -158,7 +158,6 @@ struct MoaHttpImage {
 
     if cached, let url = response.url, let image = inflatedImagesCache.object(forKey: url as NSURL) {
       Moa.logger?(.responseCached, url, nil, nil, image.moa_inflated ? "inflated" : "non-inflated")
-      assert(image.moa_inflated)
       onSuccess(image)
       return
     }
@@ -184,7 +183,7 @@ struct MoaHttpImage {
         let totalBytes = byteSize(of: image)
         inflatedImagesCache.setObject(image, forKey: url as NSURL, cost: Int(totalBytes))
       }
-      assert(image.moa_inflated)
+
       onSuccess(image)
     }
     else {
@@ -200,7 +199,6 @@ struct MoaHttpImage {
     }
 
     Moa.logger?(.responseCached, url, nil, nil, image.moa_inflated ? "inflated" : "non-inflated")
-    assert(image.moa_inflated)
     return image
   }
 
@@ -356,9 +354,10 @@ public struct MoaHttpSession {
     #endif
     
     let cache = URLCache(
-      memoryCapacity: Moa.settings.cache.memoryCapacityBytes,
+      memoryCapacity: 0,
       diskCapacity: Moa.settings.cache.diskCapacityBytes,
-      diskPath: cachePath)
+      diskPath: cachePath
+    )
     
     configuration.urlCache = cache
     
@@ -987,19 +986,15 @@ public struct MoaSettingsCache {
  
   */
 
-  public func clear(url: String? = nil) {
+  public func clear(url: URL? = nil) {
     guard let url = url else {
       MoaHttpImage.inflatedImagesCache.removeAllObjects()
       MoaHttpSession.session?.configuration.urlCache?.removeAllCachedResponses()
       return
     }
 
-    guard let aUrl = URL(string: url) else {
-      return
-    }
-
-    let request = URLRequest(url: aUrl)
-    MoaHttpImage.inflatedImagesCache.removeObject(forKey: aUrl as NSURL)
+    let request = URLRequest(url: url)
+    MoaHttpImage.inflatedImagesCache.removeObject(forKey: url as NSURL)
     MoaHttpSession.session?.configuration.urlCache?.removeCachedResponse(for: request)
   }
 }

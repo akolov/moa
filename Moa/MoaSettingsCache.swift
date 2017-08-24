@@ -38,19 +38,15 @@ public struct MoaSettingsCache {
  
   */
 
-  public func clear(url: String? = nil) {
+  public func clear(url: URL? = nil) {
     guard let url = url else {
       MoaHttpImage.inflatedImagesCache.removeAllObjects()
       MoaHttpSession.session?.configuration.urlCache?.removeAllCachedResponses()
       return
     }
 
-    guard let aUrl = URL(string: url) else {
-      return
-    }
-
-    let request = URLRequest(url: aUrl)
-    MoaHttpImage.inflatedImagesCache.removeObject(forKey: aUrl as NSURL)
+    let request = URLRequest(url: url)
+    MoaHttpImage.inflatedImagesCache.removeObject(forKey: url as NSURL)
     MoaHttpSession.session?.configuration.urlCache?.removeCachedResponse(for: request)
   }
 }
