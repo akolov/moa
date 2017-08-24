@@ -77,14 +77,15 @@ public final class Moa {
   */
   public var url: URL? {
     didSet {
-      cancel()
-
       if let url = url {
         if imageView?.image == nil {
           imageView?.image = cachedImage(url: url)
         }
 
         startDownload(url)
+      }
+      else {
+        cancel()
       }
     }
   }
