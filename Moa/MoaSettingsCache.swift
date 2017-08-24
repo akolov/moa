@@ -31,6 +31,26 @@ public struct MoaSettingsCache {
   
   */
   public var diskPath = "moaImageDownloader"
+
+  /**
+ 
+  Clears the image cache.
+ 
+  */
+
+  public func clear(url: String? = nil) {
+    guard let url = url else {
+      MoaHttpSession.session?.configuration.urlCache?.removeAllCachedResponses()
+      return
+    }
+
+    guard let aUrl = URL(string: url) else {
+      return
+    }
+
+    let request = URLRequest(url: aUrl)
+    MoaHttpSession.session?.configuration.urlCache?.removeCachedResponse(for: request)
+  }
 }
 
 func ==(lhs: MoaSettingsCache, rhs: MoaSettingsCache) -> Bool {

@@ -103,6 +103,27 @@ public final class Moa {
     imageDownloader?.cancel()
     imageDownloader = nil
   }
+
+  /**
+ 
+  Returns cached image for given URL.
+ 
+  */
+
+  public func cachedImage(url: String) -> UIImage? {
+    guard
+      let cache = MoaHttpSession.session?.configuration.urlCache,
+      let aUrl = URL(string: url) else {
+      return nil
+    }
+
+    let request = URLRequest(url: aUrl)
+    guard let response = cache.cachedResponse(for: request) else {
+      return nil
+    }
+
+    return UIImage(data: response.data)
+  }
   
   /**
   

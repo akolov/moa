@@ -640,6 +640,27 @@ public final class Moa {
     imageDownloader?.cancel()
     imageDownloader = nil
   }
+
+  /**
+ 
+  Returns cached image for given URL.
+ 
+  */
+
+  public func cachedImage(url: String) -> UIImage? {
+    guard
+      let cache = MoaHttpSession.session?.configuration.urlCache,
+      let aUrl = URL(string: url) else {
+      return nil
+    }
+
+    let request = URLRequest(url: aUrl)
+    guard let response = cache.cachedResponse(for: request) else {
+      return nil
+    }
+
+    return UIImage(data: response.data)
+  }
   
   /**
   
@@ -898,6 +919,26 @@ public struct MoaSettingsCache {
   
   */
   public var diskPath = "moaImageDownloader"
+
+  /**
+ 
+  Clears the image cache.
+ 
+  */
+
+  public func clear(url: String? = nil) {
+    guard let url = url else {
+      MoaHttpSession.session?.configuration.urlCache?.removeAllCachedResponses()
+      return
+    }
+
+    guard let aUrl = URL(string: url) else {
+      return
+    }
+
+    let request = URLRequest(url: aUrl)
+    MoaHttpSession.session?.configuration.urlCache?.removeCachedResponse(for: request)
+  }
 }
 
 func ==(lhs: MoaSettingsCache, rhs: MoaSettingsCache) -> Bool {
