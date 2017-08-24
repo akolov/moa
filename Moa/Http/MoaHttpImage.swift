@@ -41,8 +41,9 @@ struct MoaHttpImage {
       return
     }
 
-    if cached, let url = response.url, let cached = inflatedImagesCache.object(forKey: url as NSURL) {
-      onSuccess(cached)
+    if cached, let url = response.url, let image = inflatedImagesCache.object(forKey: url as NSURL) {
+      Moa.logger?(.responseCached, url, nil, nil, image.moa_inflated ? "inflated" : "non-inflated")
+      onSuccess(image)
       return
     }
     
@@ -99,7 +100,7 @@ struct MoaHttpImage {
         image = img
       },
       onError: { error, _ in
-        Moa.logger?(.responseError, url, nil, error)
+        Moa.logger?(.responseError, url, nil, error, nil)
       }
     )
 

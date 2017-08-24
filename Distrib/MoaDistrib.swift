@@ -156,9 +156,9 @@ struct MoaHttpImage {
       return
     }
 
-    if cached, let url = response.url, let cached = inflatedImagesCache.object(forKey: url as NSURL) {
-      print("Got image from NSCache: \(url)")
-      onSuccess(cached)
+    if cached, let url = response.url, let image = inflatedImagesCache.object(forKey: url as NSURL) {
+      Moa.logger?(.responseCached, url, nil, nil, image.moa_inflated ? "inflated" : "non-inflated")
+      onSuccess(image)
       return
     }
     
@@ -178,11 +178,12 @@ struct MoaHttpImage {
     }
       
     if let data = data, let image = MoaImage(data: data) {
-      image.moa_inflate()
-
       if let url = response.url {
         let totalBytes = byteSize(of: image)
         inflatedImagesCache.setObject(image, forKey: url as NSURL, cost: Int(totalBytes))
+        inflationQueue.async {
+          image.moa_inflate()
+        }
       }
 
       onSuccess(image)
@@ -214,7 +215,7 @@ struct MoaHttpImage {
         image = img
       },
       onError: { error, _ in
-        Moa.logger?(.responseError, url, nil, error)
+        Moa.logger?(.responseError, url, nil, error, nil)
       }
     )
 
@@ -245,6 +246,14 @@ struct MoaHttpImage {
     cache.totalCostLimit = Moa.settings.cache.memoryCapacityBytes
     return cache
   }()
+
+  static let inflationQueue = DispatchQueue(
+    label: "com.moa.image-inflation-queue",
+    qos: .background,
+    attributes: .concurrent,
+    autoreleaseFrequency: .workItem,
+    target: nil
+  )
 
 }
 
@@ -279,7 +288,7 @@ final class MoaHttpImageDownloader: MoaImageDownloader {
   func startDownload(_ url: URL, onSuccess: @escaping (MoaImage)->(),
     onError: @escaping (Error?, HTTPURLResponse?)->()) {
       
-    logger?(.requestSent, url, nil, nil)
+    logger?(.requestSent, url, nil, nil, nil)
     
     cancelled = false
     canLogCancel = true
@@ -287,7 +296,7 @@ final class MoaHttpImageDownloader: MoaImageDownloader {
     task = MoaHttpImage.createDataTask(url,
       onSuccess: { [weak self] image in
         self?.canLogCancel = false
-        self?.logger?(.responseSuccess, url, 200, nil)
+        self?.logger?(.responseSuccess, url, 200, nil, nil)
         onSuccess(image)
       },
       onError: { [weak self] error, response in
@@ -295,7 +304,7 @@ final class MoaHttpImageDownloader: MoaImageDownloader {
         
         if let currentSelf = self , !currentSelf.cancelled {
           // Do not report error if task was manually cancelled
-          self?.logger?(.responseError, url, response?.statusCode, error)
+          self?.logger?(.responseError, url, response?.statusCode, error, nil)
           onError(error, response)
         }
       }
@@ -312,7 +321,7 @@ final class MoaHttpImageDownloader: MoaImageDownloader {
     
     if canLogCancel {
       let url = task?.originalRequest?.url
-      logger?(.requestCancelled, url, nil, nil)
+      logger?(.requestCancelled, url, nil, nil, nil)
     }
   }
 }
@@ -475,8 +484,8 @@ Usage:
     Moa.logger = MoaConsoleLogger
 
 */
-public func MoaConsoleLogger(_ type: MoaLogType, url: URL?, statusCode: Int?, error: Error?) {
-  let text = MoaLoggerText(type, url: url, statusCode: statusCode, error: error)
+public func MoaConsoleLogger(_ type: MoaLogType, url: URL?, statusCode: Int?, error: Error?, comment: String?) {
+  let text = MoaLoggerText(type, url: url, statusCode: statusCode, error: error, comment: comment)
   print(text)
 }
 
@@ -501,7 +510,7 @@ Parameters:
 4. Error object, if applicable. Read its localizedDescription property to get a human readable error description.
 
 */
-public typealias MoaLoggerCallback = (MoaLogType, URL?, Int?, Error?)->()
+public typealias MoaLoggerCallback = (MoaLogType, URL?, Int?, Error?, String?)->()
 
 
 // ----------------------------
@@ -529,12 +538,11 @@ For logging into Xcode console you can use MoaConsoleLogger function.
     Moa.logger = MoaConsoleLogger
 
 */
-public func MoaLoggerText(_ type: MoaLogType, url: URL?, statusCode: Int?,
-  error: Error?) -> String {
+public func MoaLoggerText(_ type: MoaLogType, url: URL?, statusCode: Int?, error: Error? = nil, comment: String?) -> String {
   
   let time = MoaTime.nowLogTime
   var text = "[moa] \(time) "
-  var suffix = ""
+  var suffix = [String]()
   
   switch type {
   case .requestSent:
@@ -543,26 +551,32 @@ public func MoaLoggerText(_ type: MoaLogType, url: URL?, statusCode: Int?,
     text += "Cancelled "
   case .responseSuccess:
     text += "Received "
+  case .responseCached:
+    text += "Cached "
   case .responseError:
     text += "Error "
     
     if let statusCode = statusCode {
       text += "\(statusCode) "
     }
-    
+
     if let error = error {
       if let moaError = error as? MoaError {
-        suffix = moaError.localizedDescription
+        suffix.append(moaError.localizedDescription)
       } else {
-        suffix = error.localizedDescription
+        suffix.append(error.localizedDescription)
       }
     }
   }
-  
+
+  if let comment = comment {
+    suffix.append(comment)
+  }
+
   text += url.map { String(describing: $0) } ?? "-"
   
-  if suffix != "" {
-    text += " \(suffix)"
+  if !suffix.isEmpty {
+    text += " \(suffix.joined(separator: " "))"
   }
   
   return text
@@ -589,6 +603,9 @@ public enum MoaLogType: Int{
   
   /// Successful response is received
   case responseSuccess
+
+  /// Response is cached
+  case responseCached
   
   /// Response error is received
   case responseError

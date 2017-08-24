@@ -12,4 +12,4 @@ Parameters:
 4. Error object, if applicable. Read its localizedDescription property to get a human readable error description.
 
 */
-public typealias MoaLoggerCallback = (MoaLogType, URL?, Int?, Error?)->()
+public typealias MoaLoggerCallback = (MoaLogType, URL?, Int?, Error?, String?)->()

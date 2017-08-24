@@ -12,6 +12,9 @@ public enum MoaLogType: Int{
   
   /// Successful response is received
   case responseSuccess
+
+  /// Response is cached
+  case responseCached
   
   /// Response error is received
   case responseError

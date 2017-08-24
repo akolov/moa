@@ -9,7 +9,7 @@ Usage:
     Moa.logger = MoaConsoleLogger
 
 */
-public func MoaConsoleLogger(_ type: MoaLogType, url: URL?, statusCode: Int?, error: Error?) {
-  let text = MoaLoggerText(type, url: url, statusCode: statusCode, error: error)
+public func MoaConsoleLogger(_ type: MoaLogType, url: URL?, statusCode: Int?, error: Error?, comment: String?) {
+  let text = MoaLoggerText(type, url: url, statusCode: statusCode, error: error, comment: comment)
   print(text)
 }
