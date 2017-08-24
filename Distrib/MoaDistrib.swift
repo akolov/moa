@@ -115,6 +115,7 @@ struct MoaHttp {
 
 
 import Foundation
+import UIKit
 
 /**
 
@@ -177,7 +178,7 @@ struct MoaHttpImage {
       return
     }
       
-    if let data = data, let image = MoaImage(data: data) {
+    if let data = data, let image = MoaImage(data: data, scale: UIScreen.main.scale) {
       if Moa.settings.cache.memoryCapacityBytes > 0, let url = response.url {
         image.moa_inflate()
         let totalBytes = byteSize(of: image)
