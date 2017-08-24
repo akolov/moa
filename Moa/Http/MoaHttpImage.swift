@@ -62,7 +62,9 @@ struct MoaHttpImage {
     }
       
     if let data = data, let image = MoaImage(data: data) {
-      image.moa_inflate()
+      inflationQueue.async {
+        image.moa_inflate()
+      }
 
       if let url = response.url {
         let totalBytes = byteSize(of: image)
@@ -129,5 +131,13 @@ struct MoaHttpImage {
     cache.totalCostLimit = Moa.settings.cache.memoryCapacityBytes
     return cache
   }()
+
+  static let inflationQueue = DispatchQueue(
+    label: "com.moa.image-inflation-queue",
+    qos: .background,
+    attributes: .concurrent,
+    autoreleaseFrequency: .workItem,
+    target: nil
+  )
 
 }
